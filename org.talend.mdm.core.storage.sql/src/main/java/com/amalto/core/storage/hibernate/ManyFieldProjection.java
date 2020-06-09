@@ -13,6 +13,7 @@ package com.amalto.core.storage.hibernate;
 
 import java.util.Iterator;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.commons.lang.StringUtils;
@@ -67,7 +68,6 @@ class ManyFieldProjection extends SimpleProjection {
         ComplexTypeMetadata containingType = field.getContainingType();
         String containerTable = resolver.get(containingType);
         String collectionTable = resolver.getCollectionTable(field);
-        String containerIdColumn = resolver.get(containingType.getKeyFields().iterator().next());
         StringBuilder sqlFragment = new StringBuilder();
         if (count && !isMSSQLDataDource()) {
             sqlFragment.append("count("); //$NON-NLS-1$
@@ -75,127 +75,13 @@ class ManyFieldProjection extends SimpleProjection {
         if (distinct) {
             sqlFragment.append("distinct "); //$NON-NLS-1$
         }
-        switch (dataSource.getDialectName()) {
-            // For Postgres, uses "string_agg" function (introduced in 9.0).
-            case POSTGRES:
-                sqlFragment.append("(select string_agg(") //$NON-NLS-1$
-                        .append(collectionTable)
-                        .append(".value, ',') FROM ").append(containerTable); //$NON-NLS-1$
-                for (FieldMetadata currentKey : containingType.getKeyFields()) {
-                    String keyName = resolver.get(currentKey);
-                    sqlFragment.append(" INNER JOIN ") //$NON-NLS-1$
-                            .append(collectionTable)
-                            .append(" on ") //$NON-NLS-1$
-                            .append(containerTable).append('.').append(keyName)
-                            .append(" = ") //$NON-NLS-1$
-                            .append(collectionTable).append('.').append(keyName);
-                }
-                sqlFragment.append(" WHERE ") //$NON-NLS-1$
-                        .append(containerTable)
-                        .append('.')
-                        .append(containerIdColumn)
-                        .append(" = ") //$NON-NLS-1$
-                        .append(criteriaQuery.getSQLAlias(subCriteria))
-                        .append('.')
-                        .append(containerIdColumn).append(")"); //$NON-NLS-1$
-                break;
-            // Following databases support group_concat function
-            case H2:
-            case MYSQL:
-                sqlFragment.append("(select group_concat(") //$NON-NLS-1$
-                        .append(collectionTable)
-                        .append(".value separator ',') FROM ").append(containerTable); //$NON-NLS-1$
-                for (FieldMetadata currentKey : containingType.getKeyFields()) {
-                    String keyName = resolver.get(currentKey);
-                    sqlFragment.append(" INNER JOIN ") //$NON-NLS-1$
-                            .append(collectionTable)
-                            .append(" on ") //$NON-NLS-1$
-                            .append(containerTable).append('.').append(keyName)
-                            .append(" = ") //$NON-NLS-1$
-                            .append(collectionTable).append('.').append(keyName);
-                }
-                sqlFragment.append(" WHERE ") //$NON-NLS-1$
-                        .append(containerTable)
-                        .append('.')
-                        .append(containerIdColumn)
-                        .append(" = ") //$NON-NLS-1$
-                        .append(criteriaQuery.getSQLAlias(subCriteria))
-                        .append('.')
-                        .append(containerIdColumn).append(")"); //$NON-NLS-1$
-                break;
-            // Use Oracle 10g "listagg" function (no group_concat on Oracle).
-            case ORACLE_10G:
-                sqlFragment.append("(select listagg(") //$NON-NLS-1$
-                        .append(collectionTable)
-                        .append(".value, ',') WITHIN GROUP (ORDER BY pos) FROM ").append(containerTable); //$NON-NLS-1$
-                for (FieldMetadata currentKey : containingType.getKeyFields()) {
-                    String keyName = resolver.get(currentKey);
-                    sqlFragment.append(" INNER JOIN ") //$NON-NLS-1$
-                            .append(collectionTable)
-                            .append(" on ") //$NON-NLS-1$
-                            .append(containerTable).append('.').append(keyName)
-                            .append(" = ") //$NON-NLS-1$
-                            .append(collectionTable).append('.').append(keyName);
-                }
-                sqlFragment.append(" WHERE ") //$NON-NLS-1$
-                        .append(containerTable)
-                        .append('.')
-                        .append(containerIdColumn)
-                        .append(" = ") //$NON-NLS-1$
-                        .append(criteriaQuery.getSQLAlias(subCriteria))
-                        .append('.')
-                        .append(containerIdColumn).append(")"); //$NON-NLS-1$
-                break;
-            // SQL Server doesn't support the group_concat function -> use "stuff" function
-            case SQL_SERVER:
-                sqlFragment.append("STUFF((select ',' + ") //$NON-NLS-1$
-                        .append(collectionTable)
-                        .append(".value FROM ").append(containerTable); //$NON-NLS-1$
-                for (FieldMetadata currentKey : containingType.getKeyFields()) {
-                    String keyName = resolver.get(currentKey);
-                    sqlFragment.append(" INNER JOIN ") //$NON-NLS-1$
-                            .append(collectionTable)
-                            .append(" on ") //$NON-NLS-1$
-                            .append(containerTable).append('.').append(keyName)
-                            .append(" = ") //$NON-NLS-1$
-                            .append(collectionTable).append('.').append(keyName);
-                }
-                sqlFragment.append(" WHERE ") //$NON-NLS-1$
-                        .append(containerTable)
-                        .append('.')
-                        .append(containerIdColumn)
-                        .append(" = ") //$NON-NLS-1$
-                        .append(criteriaQuery.getSQLAlias(subCriteria))
-                        .append('.')
-                        .append(containerIdColumn)
-                        .append(" FOR XML PATH ('')), 1, 1, '')"); //$NON-NLS-1$
-                break;
-            // DB2 supports listagg() function after DB2 9.7
-            case DB2:
-                sqlFragment.append("(select listagg(") //$NON-NLS-1$
-                        .append(collectionTable)
-                        .append(".value, ',') WITHIN GROUP (ORDER BY pos) FROM ").append(containerTable); //$NON-NLS-1$
-                for (FieldMetadata currentKey : containingType.getKeyFields()) {
-                    String keyName = resolver.get(currentKey);
-                    sqlFragment.append(" INNER JOIN ") //$NON-NLS-1$
-                            .append(collectionTable)
-                            .append(" on ") //$NON-NLS-1$
-                            .append(containerTable).append('.').append(keyName)
-                            .append(" = ") //$NON-NLS-1$
-                            .append(collectionTable).append('.').append(keyName);
-                }
-                sqlFragment.append(" WHERE ") //$NON-NLS-1$
-                        .append(containerTable)
-                        .append('.')
-                        .append(containerIdColumn)
-                        .append(" = ") //$NON-NLS-1$
-                        .append(criteriaQuery.getSQLAlias(subCriteria))
-                        .append('.')
-                        .append(containerIdColumn).append(")"); //$NON-NLS-1$
-                break;
-            default:
-                throw new NotImplementedException("Support for repeatable element not implemented for dialect '" + dataSource.getDialectName() + "'.");
-        }
+        Set<String> keyNameSet = containingType.getKeyFields().stream().map((item) -> resolver.get(item)).collect(Collectors.toSet());
+        SQLGenerator sqlGenerator = SQLGenerator.selectDataSource(dataSource.getDialectName());
+        sqlFragment.append(sqlGenerator.getSelectFragment(containerTable, collectionTable))
+                   .append(sqlGenerator.getJoinFragment(criteriaQuery, subCriteria, containerTable, collectionTable, keyNameSet))
+                   .append(sqlGenerator.getWhereFragment(criteriaQuery, subCriteria, containerTable, collectionTable, keyNameSet))
+                   .append(sqlGenerator.getEndFragment());
+
         if (count && !isMSSQLDataDource()) {
             sqlFragment.append(")"); //$NON-NLS-1$
         }
@@ -204,6 +90,147 @@ class ManyFieldProjection extends SimpleProjection {
             sqlFragment = preProcessSQL(sqlFragment, criteria, containerTable, criteriaQuery, position);
         }
         return sqlFragment.toString();
+    }
+
+    private static enum SQLGenerator {
+          INNER_POSTGRES(DataSourceDialect.POSTGRES) {
+
+              @Override
+              protected String getSelectFragment(String containerTable, String collectionTable) {
+                  return new StringBuilder().append("(SELECT string_agg(") //$NON-NLS-1$
+                          .append(collectionTable).append(".value, ',') FROM ").append(containerTable)
+                          .toString();
+              }
+          },
+
+          INNER_H2(DataSourceDialect.H2) {
+
+              @Override
+              protected String getSelectFragment(String containerTable, String collectionTable) {
+                  return INNER_MYSQL.getSelectFragment(containerTable, collectionTable);
+              }
+          },
+
+          INNER_MYSQL(DataSourceDialect.MYSQL) {
+
+              @Override
+              protected String getSelectFragment(String containerTable, String collectionTable) {
+                  return new StringBuilder().append("(SELECT group_concat(") //$NON-NLS-1$
+                      .append(collectionTable)
+                      .append(".value separator ',') FROM ").append(containerTable).toString(); //$NON-NLS-1$
+              }
+          },
+
+          INNER_ORACLE_10G(DataSourceDialect.ORACLE_10G) {
+
+              @Override
+              protected String getSelectFragment(String containerTable, String collectionTable) {
+                  return new StringBuilder().append("(SELECT listagg(") //$NON-NLS-1$
+                      .append(collectionTable)
+                      .append(".value, ',') WITHIN GROUP (ORDER BY pos) FROM ").append(containerTable).toString(); //$NON-NLS-1$
+              }
+          },
+
+          INNER_SQL_SERVER(DataSourceDialect.SQL_SERVER) {
+
+              @Override
+              protected String getSelectFragment(String containerTable, String collectionTable) {
+                  return new StringBuilder().append("STUFF((select ',' + ") //$NON-NLS-1$
+                      .append(collectionTable)
+                      .append(".value FROM ").append(containerTable).toString(); //$NON-NLS-1$
+              }
+
+              @Override
+              protected String getEndFragment() {
+                  return " FOR XML PATH ('')), 1, 1, '')"; //$NON-NLS-1$
+              }
+          },
+
+          INNER_DB2(DataSourceDialect.DB2) {
+
+              @Override
+              protected String getSelectFragment(String containerTable, String collectionTable) {
+                  return new StringBuilder().append("(SELECT listagg(") //$NON-NLS-1$
+                      .append(collectionTable)
+                      .append(".value, ',') WITHIN GROUP (ORDER BY pos) FROM ").append(containerTable).toString(); //$NON-NLS-1$
+              }
+          };
+
+        private DataSourceDialect dataSourceDialect;
+
+        private SQLGenerator(DataSourceDialect dataSourceDialect) {
+            this.dataSourceDialect = dataSourceDialect;
+        }
+
+        /**
+         * The special functions, like (<b>group_concat</b> in Mysql) are identical in SQL due to different DB to use
+         * separate one, The special enum instance will overwrite the <b>getSelectFragment</b> method. And the we retrieve
+         * the data one-to-many association from the database store it in that Query object and iterate this object with
+         * the help of Iterator and finally displays the requested data on the front-end.
+         */
+        protected abstract String getSelectFragment(String containerTable, String collectionTable);
+
+        protected String getEndFragment() {
+            return ")"; //$NON-NLS-1$
+        }
+
+        /**
+         * The implementation of method to query data from multiple tables using SQL INNER JOIN statement. we often want
+         * to query data from multiple tables to have a complete result set for analysis. To query data from multiple
+         * tables using join statements. The join condition is specified in the INNER JOIN clause after the ON keyword
+         * as the expression: <b>(Table_1 INNER JOIN Table_2 ON Table_1.x_id1 = Table_2.x_id1 AND Table_1.x_id2 =
+         * Table_2.x_id2) </b>, if that's a composite key, these key will be related with AND keyword.
+         */
+        private String getJoinFragment(CriteriaQuery criteriaQuery, Criteria subCriteria, String containerTable,
+                String collectionTable, Set<String> keyNameSet) {
+            StringBuilder joinFragment = new StringBuilder();
+            boolean flag = true;
+            for (String keyName : keyNameSet) {
+                if (flag) {
+                    joinFragment.append(" INNER JOIN ").append(collectionTable).append(" ON "); //$NON-NLS-1$ $NON-NLS-1$
+                    flag = false;
+                } else {
+                    joinFragment.append(" AND "); //$NON-NLS-1$
+                }
+                joinFragment.append(containerTable).append('.').append(keyName).append(" = ") //$NON-NLS-1$
+                .append(collectionTable).append('.').append(keyName);
+            }
+            return joinFragment.toString();
+        }
+
+        /**
+         * The WHERE condition is specified by below method, if the major table is composite key, multiple condition
+         * will be generated and appented by ON keyword as the final expression. like the following fragment:
+         *
+         * <pre>
+         * WHERE Table_1.x_id1 = Table_2.x_id1 AND Table_1.x_id2 = Table_2.x_id2;
+         * </pre>
+         */
+        private String getWhereFragment(CriteriaQuery criteriaQuery, Criteria subCriteria,
+                String containerTable, String collectionTable, Set<String> keyNameSet) {
+            StringBuilder whereClause = new StringBuilder();
+            boolean flag = true;
+            for (String keyName : keyNameSet) {
+                if (flag) {
+                    whereClause.append(" WHERE "); //$NON-NLS-1$
+                    flag = false;
+                } else {
+                    whereClause.append(" AND "); //$NON-NLS-1$
+                }
+                whereClause.append(containerTable).append('.').append(keyName).append(" = ") //$NON-NLS-1$
+                    .append(criteriaQuery.getSQLAlias(subCriteria)).append('.').append(keyName);
+            }
+            return whereClause.toString();
+        }
+
+        private static SQLGenerator selectDataSource(DataSourceDialect dataSourceDialect) {
+            for (SQLGenerator item : SQLGenerator.values()) {
+                if (item.dataSourceDialect.equals(dataSourceDialect)) {
+                    return item;
+                }
+            }
+            throw new NotImplementedException("Support for repeatable element not implemented for dialect '" + dataSourceDialect + "'.");
+        }
     }
 
     /**
