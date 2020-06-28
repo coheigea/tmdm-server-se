@@ -10,6 +10,17 @@
 
 package com.amalto.core.storage;
 
+import static com.amalto.core.query.user.UserQueryBuilder.alias;
+import static com.amalto.core.query.user.UserQueryBuilder.contains;
+import static com.amalto.core.query.user.UserQueryBuilder.eq;
+import static com.amalto.core.query.user.UserQueryBuilder.from;
+import static com.amalto.core.query.user.UserQueryBuilder.fullText;
+import static com.amalto.core.query.user.UserQueryBuilder.gte;
+import static com.amalto.core.query.user.UserQueryBuilder.lte;
+import static com.amalto.core.query.user.UserQueryBuilder.or;
+import static com.amalto.core.query.user.UserQueryBuilder.taskId;
+import static com.amalto.core.query.user.UserQueryBuilder.timestamp;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -45,15 +56,16 @@ import com.amalto.core.metadata.ClassRepository;
 import com.amalto.core.query.user.Condition;
 import com.amalto.core.query.user.Select;
 import com.amalto.core.query.user.Split;
+import com.amalto.core.query.user.TypedExpression;
 import com.amalto.core.query.user.UserQueryBuilder;
 import com.amalto.core.query.user.UserQueryHelper;
 import com.amalto.core.query.user.metadata.Timestamp;
 import com.amalto.core.server.ServerContext;
 import com.amalto.core.server.StorageAdmin;
 import com.amalto.core.storage.record.DataRecord;
+import com.amalto.core.storage.record.DataRecordIncludeNullValueXmlWriter;
 import com.amalto.core.storage.record.DataRecordReader;
 import com.amalto.core.storage.record.DataRecordWriter;
-import com.amalto.core.storage.record.DataRecordIncludeNullValueXmlWriter;
 import com.amalto.core.storage.record.DataRecordXmlWriter;
 import com.amalto.core.storage.record.SystemDataRecordXmlWriter;
 import com.amalto.core.storage.record.XmlDOMDataRecordReader;
@@ -63,8 +75,6 @@ import com.amalto.xmlserver.interfaces.IWhereItem;
 import com.amalto.xmlserver.interfaces.IXmlServerSLWrapper;
 import com.amalto.xmlserver.interfaces.ItemPKCriteria;
 import com.amalto.xmlserver.interfaces.XmlServerException;
-
-import static com.amalto.core.query.user.UserQueryBuilder.*;
 
 public class StorageWrapper implements IXmlServerSLWrapper {
 
@@ -423,6 +433,12 @@ public class StorageWrapper implements IXmlServerSLWrapper {
             storage.begin();
             for (ComplexTypeMetadata type : types) {
                 UserQueryBuilder qb = from(type);
+                for (Iterator<FieldMetadata> iterator = type.getKeyFields().iterator(); iterator.hasNext();) {
+                    List<TypedExpression> fields = UserQueryHelper.getFields(type, iterator.next().getName());
+                    for (TypedExpression field : fields) {
+                        qb.select(field);
+                    }
+                }
                 qb.where(UserQueryHelper.buildCondition(qb, whereItem, repository));
                 StorageResults results = storage.fetch(qb.getSelect());
                 try {
