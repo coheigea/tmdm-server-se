@@ -45,6 +45,7 @@ import com.amalto.core.metadata.ClassRepository;
 import com.amalto.core.query.user.Condition;
 import com.amalto.core.query.user.Select;
 import com.amalto.core.query.user.Split;
+import com.amalto.core.query.user.TypedExpression;
 import com.amalto.core.query.user.UserQueryBuilder;
 import com.amalto.core.query.user.UserQueryHelper;
 import com.amalto.core.query.user.metadata.Timestamp;
@@ -423,6 +424,12 @@ public class StorageWrapper implements IXmlServerSLWrapper {
             storage.begin();
             for (ComplexTypeMetadata type : types) {
                 UserQueryBuilder qb = from(type);
+                for (Iterator<FieldMetadata> iterator = type.getKeyFields().iterator(); iterator.hasNext();) {
+                    List<TypedExpression> fields = UserQueryHelper.getFields(type, iterator.next().getName());
+                    for (TypedExpression field : fields) {
+                        qb.select(field);
+                    }
+                }
                 qb.where(UserQueryHelper.buildCondition(qb, whereItem, repository));
                 StorageResults results = storage.fetch(qb.getSelect());
                 try {
