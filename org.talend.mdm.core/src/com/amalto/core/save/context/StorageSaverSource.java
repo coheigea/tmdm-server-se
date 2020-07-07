@@ -70,9 +70,12 @@ public class StorageSaverSource implements SaverSource {
         this.userName = userName;
     }
 
-    private Expression buildQueryByID(Storage storage, String typeName, String[] key) {
+    private Expression buildQueryByID(Storage storage, String typeName, String[] key, boolean isProjection) {
         ComplexTypeMetadata type = storage.getMetadataRepository().getComplexType(typeName);
         UserQueryBuilder qb = from(type);
+        if (isProjection) {
+            qb.selectId(type);
+        }
         Collection<FieldMetadata> keyFields = type.getKeyFields();
         int i = 0;
         for (FieldMetadata keyField : keyFields) {
@@ -84,7 +87,7 @@ public class StorageSaverSource implements SaverSource {
     @Override
     public MutableDocument get(String dataClusterName, String dataModelName, String typeName, String[] key) {
         Storage storage = getStorage(dataClusterName);
-        StorageResults results = storage.fetch(buildQueryByID(storage, typeName, key));
+        StorageResults results = storage.fetch(buildQueryByID(storage, typeName, key, false));
         try {
             Iterator<DataRecord> iterator = results.iterator();
             if (!iterator.hasNext()) {
@@ -113,7 +116,7 @@ public class StorageSaverSource implements SaverSource {
         if (key.length < type.getKeyFields().size()) {
             return false;
         }
-        StorageResults results = storage.fetch(buildQueryByID(storage, typeName, key)); // Expect a transaction to be active
+        StorageResults results = storage.fetch(buildQueryByID(storage, typeName, key, true)); // Expect a transaction to be active
         try {
             Iterator<DataRecord> iterator = results.iterator();
             return iterator.hasNext();
