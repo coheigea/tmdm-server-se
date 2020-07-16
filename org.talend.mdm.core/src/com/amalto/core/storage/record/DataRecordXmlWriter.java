@@ -206,16 +206,24 @@ public class DataRecordXmlWriter implements DataRecordWriter {
                 } else {
                     List<DataRecord> recordList = (List<DataRecord>) record.get(containedField);
                     if (recordList != null) {
+                        // "role-specifications" of "role-pOJO"
+                        boolean isRoleSpecifications = "role-pOJO".equals(containedField.getDeclaringType().getName()) //$NON-NLS-1$
+                                && "role-specifications".equals(containedField.getName()); //$NON-NLS-1$
                         for (DataRecord dataRecord : recordList) {
                             if (!dataRecord.isEmpty()) {
-                                // TODO Limit new field printer instances
-                                DefaultMetadataVisitor<Void> fieldPrinter = new FieldPrinter(dataRecord, out);
-                                Collection<FieldMetadata> fields = dataRecord.getType().getFields();
-                                writeContainedField(containedField, dataRecord);
-                                for (FieldMetadata field : fields) {
-                                    field.accept(fieldPrinter);
+                                // Write embedded XML directly
+                                if (isRoleSpecifications) {
+                                    out.write(dataRecord.get("value").toString()); //$NON-NLS-1$
+                                } else {
+                                    // TODO Limit new field printer instances
+                                    DefaultMetadataVisitor<Void> fieldPrinter = new FieldPrinter(dataRecord, out);
+                                    Collection<FieldMetadata> fields = dataRecord.getType().getFields();
+                                    writeContainedField(containedField, dataRecord);
+                                    for (FieldMetadata field : fields) {
+                                        field.accept(fieldPrinter);
+                                    }
+                                    out.write("</" + containedField.getName() + ">"); //$NON-NLS-1$ //$NON-NLS-2$
                                 }
-                                out.write("</" + containedField.getName() + ">"); //$NON-NLS-1$ //$NON-NLS-2$
                             }
                         }
                     }
