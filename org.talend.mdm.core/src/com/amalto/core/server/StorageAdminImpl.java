@@ -133,7 +133,7 @@ public class StorageAdminImpl implements StorageAdmin {
             delete(clusterName, StorageType.STAGING, dropExistingData);
         }
     }
-
+private int in = 0;
     public Storage create(String dataModelName, String storageName, StorageType type, String dataSourceName) {
         if (MDMConfiguration.getConfiguration().get(DataSourceFactory.DB_DATASOURCES) == null) {
             throw new IllegalStateException("MDM Configuration is not configured for RDBMS storage.");
@@ -143,6 +143,23 @@ public class StorageAdminImpl implements StorageAdmin {
         }
         String actualStorageName = StringUtils.substringBefore(storageName, STAGING_SUFFIX);
         String actualDataModelName = StringUtils.substringBefore(dataModelName, STAGING_SUFFIX);
+        if (storageName.length() > 30 && in++ < 5) {
+            StackTraceElement[] mStacks = Thread.currentThread().getStackTrace();
+            int i = 0;
+            StringBuilder sb = new StringBuilder();
+            for (StackTraceElement s : mStacks) {
+                if (i++ > 50) {
+                    break;
+                }
+                sb.append("ClassName: " + s.getClassName() + ", MethodName: " + s.getMethodName() + ", Row:" + s.getLineNumber()).append("\n");
+            }
+            String threadName = Thread.currentThread().getName();
+            LOGGER.info("\nthreadName:::"+threadName+"\n");
+            LOGGER.info("\n=======================begin StorageAdminImpl===============\n");
+            LOGGER.info("storageName=[" +storageName+ "],dataModelName=[" + dataModelName+ "]\n");
+            LOGGER.info(sb.toString());
+            LOGGER.info("\n=======================end StorageAdminImpl===============\n");
+        }
         try {
             switch (type) {
             case MASTER:

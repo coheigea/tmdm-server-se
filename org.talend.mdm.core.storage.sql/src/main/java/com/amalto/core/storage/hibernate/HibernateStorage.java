@@ -387,10 +387,28 @@ public class HibernateStorage implements Storage {
         configuration.setEntityResolver(ENTITY_RESOLVER);
     }
 
+    private int in  = 0;
     @SuppressWarnings({ "unchecked", "rawtypes" })
     @Override
     public synchronized void prepare(MetadataRepository repository, Set<Expression> optimizedExpressions, boolean force,
             boolean dropExistingData) {
+        if (storageName != null && storageName.length() > 30 && in++ < 5) {
+            StackTraceElement[] mStacks = Thread.currentThread().getStackTrace();
+            int i = 0;
+            StringBuilder sb = new StringBuilder();
+            for (StackTraceElement s : mStacks) {
+                if (i++ > 50) {
+                    break;
+                }
+                sb.append("ClassName: " + s.getClassName() + ", MethodName: " + s.getMethodName() + ", Row:" + s.getLineNumber()).append("\n");
+            }
+            String threadName = Thread.currentThread().getName();
+            LOGGER.info("\nthreadName:::"+threadName+"\n");
+            LOGGER.info("\n=======================begin HibernateStorage===============\n");
+            LOGGER.info("storageName=[" +storageName+ "]\n");
+            LOGGER.info(sb.toString());
+            LOGGER.info("\n=======================end HibernateStorage===============\n");
+        }
         if (!force && isPrepared) {
             return; // No op operation
         }
@@ -1760,8 +1778,8 @@ public class HibernateStorage implements Storage {
     @Override
     public synchronized void close() {
         LOGGER.info("Closing storage '" + storageName + "' (" + storageType + ")."); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-        MDMTransactionSessionContext.forgetStorage(factory);
         try {
+            MDMTransactionSessionContext.forgetStorage(factory);
             if (storageClassLoader != null) {
                 storageClassLoader.bind(Thread.currentThread());
             }
@@ -1780,6 +1798,8 @@ public class HibernateStorage implements Storage {
                 factory = null; // SessionFactory#close() documentation advises to remove all references to
                                 // SessionFactory.
             }
+        } catch (Exception e) {
+            LOGGER.error("HibernateStorage#close: " + e);
         } finally {
             if (storageClassLoader != null) {
                 storageClassLoader.unbind(Thread.currentThread()); // TMDM-5934: Prevent restoring a closed classloader.
@@ -1790,8 +1810,12 @@ public class HibernateStorage implements Storage {
             configuration = null;
         }
         // Reset caches
-        ListIterator.resetTypeReaders();
-        ScrollableIterator.resetTypeReaders();
+        try {
+            ListIterator.resetTypeReaders();
+            ScrollableIterator.resetTypeReaders();
+        } catch (Exception e) {
+            LOGGER.error("HibernateStorage#close#reset caches::: " + e);
+        }
         LOGGER.info("Storage '" + storageName + "' (" + storageType + ") closed."); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
     }
 
