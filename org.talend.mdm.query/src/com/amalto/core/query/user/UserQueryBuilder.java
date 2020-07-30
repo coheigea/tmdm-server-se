@@ -27,6 +27,7 @@ import org.talend.tql.parser.Tql;
 import javax.jws.soap.SOAPBinding;
 import java.math.BigDecimal;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class UserQueryBuilder {
@@ -751,7 +752,7 @@ public class UserQueryBuilder {
         } catch (NumberFormatException e) {
             // Try date format parsing
             try {
-                Date date = DateTimeConstant.DATE_FORMAT.parse(dateTime); // Or maybe a XML date?
+                Date date = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(dateTime); // Or maybe a XML date?
                 dateTimeAsLong = date.getTime();
             } catch (ParseException e1) {
                 throw new IllegalArgumentException("Date '" + dateTime + "' is neither a long nor a date time that can be parsed.", e1);
