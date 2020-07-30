@@ -392,23 +392,6 @@ public class HibernateStorage implements Storage {
     @Override
     public synchronized void prepare(MetadataRepository repository, Set<Expression> optimizedExpressions, boolean force,
             boolean dropExistingData) {
-        if (storageName != null && storageName.length() > 30 && in++ < 5) {
-            StackTraceElement[] mStacks = Thread.currentThread().getStackTrace();
-            int i = 0;
-            StringBuilder sb = new StringBuilder();
-            for (StackTraceElement s : mStacks) {
-                if (i++ > 50) {
-                    break;
-                }
-                sb.append("ClassName: " + s.getClassName() + ", MethodName: " + s.getMethodName() + ", Row:" + s.getLineNumber()).append("\n");
-            }
-            String threadName = Thread.currentThread().getName();
-            LOGGER.info("\nthreadName:::"+threadName+"\n");
-            LOGGER.info("\n=======================begin HibernateStorage===============\n");
-            LOGGER.info("storageName=[" +storageName+ "]\n");
-            LOGGER.info(sb.toString());
-            LOGGER.info("\n=======================end HibernateStorage===============\n");
-        }
         if (!force && isPrepared) {
             return; // No op operation
         }
@@ -660,9 +643,11 @@ public class HibernateStorage implements Storage {
                     schemaValidator.validate(); // This is supposed to throw exception on validation issue.
                     break;
                 case UPDATE:
-                    SchemaUpdate schemaUpdate = new SchemaUpdate(configuration);
-                    schemaUpdate.execute(false, true);
-                    exceptions = schemaUpdate.getExceptions();
+                    synchronized (HibernateStorage.class) {
+                        SchemaUpdate schemaUpdate = new SchemaUpdate(configuration);
+                        schemaUpdate.execute(false, true);
+                        exceptions = schemaUpdate.getExceptions();
+                    }
                     break;
                 }
                 // Throw an exception if schema update met issue(s).
@@ -1795,11 +1780,10 @@ public class HibernateStorage implements Storage {
             // Close Hibernate session
             if (factory != null) {
                 factory.close();
-                factory = null; // SessionFactory#close() documentation advises to remove all references to
-                                // SessionFactory.
+                factory = null; // SessionFactory#close() documentation advises to remove all references to SessionFactory.
             }
-        } catch (Exception e) {
-            LOGGER.error("HibernateStorage#close: " + e);
+        } catch (HibernateException | NullPointerException e) {
+            throw new RuntimeException("An exception occurred while closing storage '" + storageName + "' (" + storageType + ")." + e); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
         } finally {
             if (storageClassLoader != null) {
                 storageClassLoader.unbind(Thread.currentThread()); // TMDM-5934: Prevent restoring a closed classloader.
@@ -1809,13 +1793,10 @@ public class HibernateStorage implements Storage {
             isPrepared = false;
             configuration = null;
         }
+
         // Reset caches
-        try {
-            ListIterator.resetTypeReaders();
-            ScrollableIterator.resetTypeReaders();
-        } catch (Exception e) {
-            LOGGER.error("HibernateStorage#close#reset caches::: " + e);
-        }
+        ListIterator.resetTypeReaders();
+        ScrollableIterator.resetTypeReaders();
         LOGGER.info("Storage '" + storageName + "' (" + storageType + ") closed."); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
     }
 
