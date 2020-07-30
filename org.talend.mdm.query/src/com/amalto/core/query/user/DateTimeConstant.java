@@ -45,7 +45,7 @@ public class DateTimeConstant implements ConstantExpression<Date> {
     }
 
     private static final ThreadLocal<SimpleDateFormat> threadLocal = ThreadLocal.<SimpleDateFormat> withInitial(() -> {
-        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+        return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss"); //$NON-NLS-1$
     });
 
     public static Date parse(String dateStr) throws ParseException {
