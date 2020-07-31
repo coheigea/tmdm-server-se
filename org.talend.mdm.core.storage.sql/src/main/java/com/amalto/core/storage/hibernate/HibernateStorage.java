@@ -627,14 +627,16 @@ public class HibernateStorage implements Storage {
                 List exceptions = Collections.emptyList();
                 switch (schemaGeneration) {
                 case CREATE:
-                    SchemaExport schemaExport = new SchemaExport(configuration);
-                    schemaExport.create(false, true);
-                    // Exception may happen during recreation (hibernate may perform statements on tables that does
-                    // not exist): these exceptions are supposed to be harmless (but log them to DEBUG just in case).
-                    if (LOGGER.isDebugEnabled()) {
-                        LOGGER.debug("Exception(s) occurred during schema creation:"); //$NON-NLS-1$
-                        for (Object exceptionObject : schemaExport.getExceptions()) {
-                            LOGGER.debug(((Exception) exceptionObject).getMessage());
+                    synchronized (HibernateStorage.class) {
+                        SchemaExport schemaExport = new SchemaExport(configuration);
+                        schemaExport.create(false, true);
+                        // Exception may happen during recreation (hibernate may perform statements on tables that does
+                        // not exist): these exceptions are supposed to be harmless (but log them to DEBUG just in case).
+                        if (LOGGER.isDebugEnabled()) {
+                            LOGGER.debug("Exception(s) occurred during schema creation:"); //$NON-NLS-1$
+                            for (Object exceptionObject : schemaExport.getExceptions()) {
+                                LOGGER.debug(((Exception) exceptionObject).getMessage());
+                            }
                         }
                     }
                     break;
@@ -1763,8 +1765,8 @@ public class HibernateStorage implements Storage {
     @Override
     public synchronized void close() {
         LOGGER.info("Closing storage '" + storageName + "' (" + storageType + ")."); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+        MDMTransactionSessionContext.forgetStorage(factory);
         try {
-            MDMTransactionSessionContext.forgetStorage(factory);
             if (storageClassLoader != null) {
                 storageClassLoader.bind(Thread.currentThread());
             }
@@ -1772,7 +1774,11 @@ public class HibernateStorage implements Storage {
             TransactionManager transactionManager = ServerContext.INSTANCE.get().getTransactionManager();
             List<String> transactions = transactionManager.list();
             for (String transaction : transactions) {
-                StorageTransaction storageTransaction = transactionManager.get(transaction).exclude(this);
+                com.amalto.core.storage.transaction.Transaction activeTransaction = transactionManager.get(transaction);
+                if (activeTransaction == null) {
+                    throw new IllegalStateException("Transaction [" + transaction + "] should have been removed from current transactions.\n");
+                }
+                StorageTransaction storageTransaction = activeTransaction.exclude(this);
                 if (storageTransaction != null) {
                     storageTransaction.rollback();
                 }
@@ -1783,7 +1789,7 @@ public class HibernateStorage implements Storage {
                 factory = null; // SessionFactory#close() documentation advises to remove all references to SessionFactory.
             }
         } catch (HibernateException | NullPointerException e) {
-            throw new RuntimeException("An exception occurred while closing storage '" + storageName + "' (" + storageType + ")." + e); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+            throw new RuntimeException("An exception occurred while closing storage '" + storageName + "' (" + storageType + ").\n" + e); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
         } finally {
             if (storageClassLoader != null) {
                 storageClassLoader.unbind(Thread.currentThread()); // TMDM-5934: Prevent restoring a closed classloader.
@@ -1793,7 +1799,6 @@ public class HibernateStorage implements Storage {
             isPrepared = false;
             configuration = null;
         }
-
         // Reset caches
         ListIterator.resetTypeReaders();
         ScrollableIterator.resetTypeReaders();
