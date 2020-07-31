@@ -387,7 +387,6 @@ public class HibernateStorage implements Storage {
         configuration.setEntityResolver(ENTITY_RESOLVER);
     }
 
-    private int in  = 0;
     @SuppressWarnings({ "unchecked", "rawtypes" })
     @Override
     public synchronized void prepare(MetadataRepository repository, Set<Expression> optimizedExpressions, boolean force,
@@ -627,16 +626,14 @@ public class HibernateStorage implements Storage {
                 List exceptions = Collections.emptyList();
                 switch (schemaGeneration) {
                 case CREATE:
-                    synchronized (HibernateStorage.class) {
-                        SchemaExport schemaExport = new SchemaExport(configuration);
-                        schemaExport.create(false, true);
-                        // Exception may happen during recreation (hibernate may perform statements on tables that does
-                        // not exist): these exceptions are supposed to be harmless (but log them to DEBUG just in case).
-                        if (LOGGER.isDebugEnabled()) {
-                            LOGGER.debug("Exception(s) occurred during schema creation:"); //$NON-NLS-1$
-                            for (Object exceptionObject : schemaExport.getExceptions()) {
-                                LOGGER.debug(((Exception) exceptionObject).getMessage());
-                            }
+                    SchemaExport schemaExport = new SchemaExport(configuration);
+                    schemaExport.create(false, true);
+                    // Exception may happen during recreation (hibernate may perform statements on tables that does
+                    // not exist): these exceptions are supposed to be harmless (but log them to DEBUG just in case).
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("Exception(s) occurred during schema creation:"); //$NON-NLS-1$
+                        for (Object exceptionObject : schemaExport.getExceptions()) {
+                            LOGGER.debug(((Exception) exceptionObject).getMessage());
                         }
                     }
                     break;
@@ -645,11 +642,9 @@ public class HibernateStorage implements Storage {
                     schemaValidator.validate(); // This is supposed to throw exception on validation issue.
                     break;
                 case UPDATE:
-                    synchronized (HibernateStorage.class) {
-                        SchemaUpdate schemaUpdate = new SchemaUpdate(configuration);
-                        schemaUpdate.execute(false, true);
-                        exceptions = schemaUpdate.getExceptions();
-                    }
+                    SchemaUpdate schemaUpdate = new SchemaUpdate(configuration);
+                    schemaUpdate.execute(false, true);
+                    exceptions = schemaUpdate.getExceptions();
                     break;
                 }
                 // Throw an exception if schema update met issue(s).
