@@ -51,10 +51,10 @@ public class SearchFieldCreator {
             } else {
                 String keyPath = entityModel.getKeys()[0];
                 TypeModel keyTypeModel = entityModel.getTypeModel(keyPath);
-                boolean isString = DataTypeConstants.STRING.getTypeName().equals(keyTypeModel.getType().getTypeName());
-                boolean isAutoIncrement = DataTypeConstants.AUTO_INCREMENT.getTypeName()
-                        .equals(keyTypeModel.getType().getTypeName());
-                boolean isUUID = DataTypeConstants.UUID.getTypeName().equals(keyTypeModel.getType().getTypeName());
+                String baseType = keyTypeModel.getType().getBaseTypeName();
+                boolean isString = DataTypeConstants.STRING.getTypeName().equals(baseType);
+                boolean isAutoIncrement = DataTypeConstants.AUTO_INCREMENT.getTypeName().equals(baseType);
+                boolean isUUID = DataTypeConstants.UUID.getTypeName().equals(baseType);
                 if (isString || isAutoIncrement || isUUID) {
                     cons = OperatorConstants.stringOperators;
                     field = createForeignKeyField(typeModel, true);
